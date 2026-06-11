@@ -5,6 +5,7 @@ import cn.ltssil.linux.service.ProcessService;
 import cn.ltssil.linux.util.LogUtil;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.time.LocalDateTime;
@@ -32,6 +33,20 @@ public class MainFrame extends JFrame {
     private JButton sortButton;
 
     public MainFrame() {
+        UIManager.put("Label.font",
+                new Font("微软雅黑", Font.PLAIN, 14));
+
+        UIManager.put("Button.font",
+                new Font("微软雅黑", Font.PLAIN, 14));
+
+        UIManager.put("TextField.font",
+                new Font("微软雅黑", Font.PLAIN, 14));
+
+        UIManager.put("Table.font",
+                new Font("微软雅黑", Font.PLAIN, 13));
+
+        UIManager.put("TableHeader.font",
+                new Font("微软雅黑", Font.BOLD, 14));
         initFrame();
         initComponents();
         loadProcessData();
@@ -40,6 +55,9 @@ public class MainFrame extends JFrame {
     }
 
     private void initFrame() {
+        getContentPane().setBackground(
+                new Color(245, 247, 250)
+        );
         setTitle("Linux Task Manager");
         setSize(1100, 720);
         setLocationRelativeTo(null);
@@ -51,7 +69,28 @@ public class MainFrame extends JFrame {
         JPanel northPanel = new JPanel();
         northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
 
-        JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel infoPanel = new JPanel(
+                new FlowLayout(
+                        FlowLayout.CENTER,
+                        30,
+                        10
+                )
+        );
+
+        infoPanel.setBackground(
+                new Color(230, 240, 255)
+        );
+
+        infoPanel.setBorder(
+                BorderFactory.createCompoundBorder(
+                        BorderFactory.createEmptyBorder(
+                                8,10,8,10
+                        ),
+                        BorderFactory.createLineBorder(
+                                new Color(180,200,230)
+                        )
+                )
+        );
 
         cpuLabel = new JLabel();
         memoryLabel = new JLabel();
@@ -101,11 +140,119 @@ public class MainFrame extends JFrame {
         };
 
         processTable = new JTable(tableModel);
-        processTable.setRowHeight(24);
+
+        processTable.setRowHeight(28);
+
         processTable.setAutoCreateRowSorter(true);
 
+        processTable.setGridColor(new Color(220,220,220));
+
+        processTable.setShowGrid(true);
+
+        processTable.setSelectionBackground(
+                new Color(0,120,215)
+        );
+
+        processTable.setSelectionForeground(
+                Color.WHITE
+        );
+
+        processTable.getTableHeader().setBackground(
+                new Color(52,73,94)
+        );
+
+        processTable.getTableHeader().setForeground(
+                Color.WHITE
+        );
+
+        processTable.getTableHeader().setReorderingAllowed(false);
+
+        processTable.setDefaultRenderer(
+                Object.class,
+                new DefaultTableCellRenderer() {
+
+                    @Override
+                    public Component getTableCellRendererComponent(
+                            JTable table,
+                            Object value,
+                            boolean isSelected,
+                            boolean hasFocus,
+                            int row,
+                            int column
+                    ) {
+
+                        Component c =
+                                super.getTableCellRendererComponent(
+                                        table,
+                                        value,
+                                        isSelected,
+                                        hasFocus,
+                                        row,
+                                        column
+                                );
+
+                        if (!isSelected) {
+
+                            if (row % 2 == 0) {
+
+                                c.setBackground(Color.WHITE);
+
+                            } else {
+
+                                c.setBackground(
+                                        new Color(
+                                                245,
+                                                248,
+                                                252
+                                        )
+                                );
+                            }
+                        }
+
+                        return c;
+                    }
+                }
+        );
+
         JScrollPane scrollPane = new JScrollPane(processTable);
+
         add(scrollPane, BorderLayout.CENTER);
+
+
+        processTable.setGridColor(
+                new Color(220,220,220)
+        );
+
+        processTable.setShowGrid(true);
+
+        processTable.setSelectionBackground(
+                new Color(0,120,215)
+        );
+
+        processTable.setSelectionForeground(
+                Color.WHITE
+        );
+
+        processTable.setRowHeight(28);
+
+        processTable.setAutoResizeMode(
+                JTable.AUTO_RESIZE_LAST_COLUMN
+        );
+
+        processTable.getTableHeader()
+                .setBackground(
+                        new Color(52,73,94)
+                );
+
+        processTable.getTableHeader()
+                .setForeground(
+                        Color.WHITE
+                );
+
+        processTable.getTableHeader()
+                .setReorderingAllowed(false);
+
+
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
 
@@ -124,6 +271,17 @@ public class MainFrame extends JFrame {
         killButton.addActionListener(e -> killSelectedProcess());
         exportButton.addActionListener(e -> exportLog());
         sortButton.addActionListener(e -> loadProcessData());
+
+        styleButton(searchButton);
+        styleButton(refreshButton);
+        styleButton(killButton);
+        styleButton(exportButton);
+        styleButton(sortButton);
+        killButton.setBackground(
+                new Color(220,53,69)
+        );
+
+
     }
 
     private void updateSystemInfo(long processCount) {
@@ -246,7 +404,33 @@ public class MainFrame extends JFrame {
     }
 
     private void startAutoRefresh() {
-        Timer timer = new Timer(5000, e -> loadProcessData());
+        Timer timer = new Timer(1000, e -> loadProcessData());
         timer.start();
+    }
+
+    private void styleButton(JButton button) {
+
+        button.setFocusPainted(false);
+
+        button.setBackground(
+                new Color(70,130,180)
+        );
+
+        button.setForeground(Color.WHITE);
+
+        button.setFont(
+                new Font(
+                        "微软雅黑",
+                        Font.BOLD,
+                        14
+                )
+        );
+
+        button.setPreferredSize(
+                new Dimension(
+                        120,
+                        35
+                )
+        );
     }
 }
