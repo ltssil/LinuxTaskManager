@@ -76,6 +76,7 @@ public class MainFrame extends JFrame {
 
         searchButton.addActionListener(e -> searchByPid());
         refreshButton.addActionListener(e -> loadProcessData());
+        killButton.addActionListener(e -> killSelectedProcess());
     }
 
     private void loadProcessData() {
@@ -113,6 +114,56 @@ public class MainFrame extends JFrame {
 
         } catch (NumberFormatException ex) {
             JOptionPane.showMessageDialog(this, "PID必须是数字");
+        }
+    }
+
+    private void killSelectedProcess() {
+
+        int row = processTable.getSelectedRow();
+
+        if (row == -1) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "请先选择一个进程"
+            );
+
+            return;
+        }
+
+        long pid = Long.parseLong(
+                tableModel.getValueAt(row, 0).toString()
+        );
+
+        int result = JOptionPane.showConfirmDialog(
+                this,
+                "确定结束 PID = " + pid + " ?",
+                "确认",
+                JOptionPane.YES_NO_OPTION
+        );
+
+        if (result != JOptionPane.YES_OPTION) {
+            return;
+        }
+
+        boolean success =
+                processService.killProcess(pid);
+
+        if (success) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "结束成功"
+            );
+
+            loadProcessData();
+
+        } else {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "结束失败"
+            );
         }
     }
 }

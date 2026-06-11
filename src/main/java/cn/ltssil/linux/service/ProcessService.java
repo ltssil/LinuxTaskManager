@@ -43,4 +43,21 @@ public class ProcessService {
             return new ProcessInfo(pid, name, command);
         });
     }
+
+    public boolean killProcess(long pid) {
+
+        return ProcessHandle.of(pid)
+                .map(process -> {
+
+                    boolean result = process.destroy();
+
+                    if (!result) {
+                        result = process.destroyForcibly();
+                    }
+
+                    return result;
+
+                })
+                .orElse(false);
+    }
 }
