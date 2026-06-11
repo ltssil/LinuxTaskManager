@@ -60,4 +60,8 @@ public class ProcessService {
                 })
                 .orElse(false);
     }
+
+    public long getProcessCount() {
+        return ProcessHandle.allProcesses().count();
+    }
 }

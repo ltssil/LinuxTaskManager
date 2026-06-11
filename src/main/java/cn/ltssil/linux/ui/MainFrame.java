@@ -7,11 +7,18 @@ import cn.ltssil.linux.util.LogUtil;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 
 public class MainFrame extends JFrame {
 
     private final ProcessService processService = new ProcessService();
+
+    private JLabel cpuLabel;
+    private JLabel memoryLabel;
+    private JLabel timeLabel;
+    private JLabel processCountLabel;
 
     private JTable processTable;
     private DefaultTableModel tableModel;
@@ -25,6 +32,7 @@ public class MainFrame extends JFrame {
     public MainFrame() {
         initFrame();
         initComponents();
+        updateSystemInfo();
         loadProcessData();
         setVisible(true);
         startAutoRefresh();
@@ -39,8 +47,24 @@ public class MainFrame extends JFrame {
     }
 
     private void initComponents() {
-        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        JPanel northPanel = new JPanel();
+        northPanel.setLayout(new BoxLayout(northPanel, BoxLayout.Y_AXIS));
 
+        JPanel infoPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        cpuLabel = new JLabel();
+        memoryLabel = new JLabel();
+        processCountLabel = new JLabel();
+        timeLabel = new JLabel();
+
+        infoPanel.add(cpuLabel);
+        infoPanel.add(Box.createHorizontalStrut(25));
+        infoPanel.add(memoryLabel);
+        infoPanel.add(Box.createHorizontalStrut(25));
+        infoPanel.add(processCountLabel);
+        infoPanel.add(Box.createHorizontalStrut(25));
+        infoPanel.add(timeLabel);
+
+        JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         pidField = new JTextField(15);
         searchButton = new JButton("查询PID");
 
@@ -48,7 +72,10 @@ public class MainFrame extends JFrame {
         topPanel.add(pidField);
         topPanel.add(searchButton);
 
-        add(topPanel, BorderLayout.NORTH);
+        northPanel.add(infoPanel);
+        northPanel.add(topPanel);
+
+        add(northPanel, BorderLayout.NORTH);
 
         String[] columns = {"PID", "进程名称", "命令路径"};
         tableModel = new DefaultTableModel(columns, 0) {
@@ -65,7 +92,6 @@ public class MainFrame extends JFrame {
         add(scrollPane, BorderLayout.CENTER);
 
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
-
         refreshButton = new JButton("刷新");
         killButton = new JButton("结束进程");
         exportButton = new JButton("导出日志");
@@ -77,11 +103,28 @@ public class MainFrame extends JFrame {
         add(bottomPanel, BorderLayout.SOUTH);
 
         searchButton.addActionListener(e -> searchByPid());
-        refreshButton.addActionListener(e -> loadProcessData());
+        refreshButton.addActionListener(e -> {
+            updateSystemInfo();
+            loadProcessData();
+        });
         killButton.addActionListener(e -> killSelectedProcess());
-        exportButton.addActionListener(
-                e -> exportLog()
-        );
+        exportButton.addActionListener(e -> exportLog());
+    }
+
+    private void updateSystemInfo() {
+        Runtime runtime = Runtime.getRuntime();
+
+        int cpuCount = runtime.availableProcessors();
+        long usedMemoryMb = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
+        long totalMemoryMb = runtime.totalMemory() / 1024 / 1024;
+        long processCount = processService.getProcessCount();
+
+        cpuLabel.setText("CPU核心数: " + cpuCount);
+        memoryLabel.setText("JVM内存: " + usedMemoryMb + "MB / " + totalMemoryMb + "MB");
+        processCountLabel.setText("进程数: " + processCount);
+
+        timeLabel.setText("时间: " +
+                LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
     }
 
     private void loadProcessData() {
@@ -95,6 +138,8 @@ public class MainFrame extends JFrame {
                     process.getCommand()
             });
         }
+
+        updateSystemInfo();
     }
 
     private void searchByPid() {
@@ -115,6 +160,7 @@ public class MainFrame extends JFrame {
                         process.getName(),
                         process.getCommand()
                 });
+                updateSystemInfo();
             }, () -> JOptionPane.showMessageDialog(this, "未找到该PID对应的进程"));
 
         } catch (NumberFormatException ex) {
@@ -123,22 +169,14 @@ public class MainFrame extends JFrame {
     }
 
     private void killSelectedProcess() {
-
         int row = processTable.getSelectedRow();
 
         if (row == -1) {
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "请先选择一个进程"
-            );
-
+            JOptionPane.showMessageDialog(this, "请先选择一个进程");
             return;
         }
 
-        long pid = Long.parseLong(
-                tableModel.getValueAt(row, 0).toString()
-        );
+        long pid = Long.parseLong(tableModel.getValueAt(row, 0).toString());
 
         int result = JOptionPane.showConfirmDialog(
                 this,
@@ -151,34 +189,19 @@ public class MainFrame extends JFrame {
             return;
         }
 
-        boolean success =
-                processService.killProcess(pid);
+        boolean success = processService.killProcess(pid);
 
         if (success) {
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "结束成功"
-            );
-
+            JOptionPane.showMessageDialog(this, "结束成功");
             loadProcessData();
-
         } else {
-
-            JOptionPane.showMessageDialog(
-                    this,
-                    "结束失败"
-            );
+            JOptionPane.showMessageDialog(this, "结束失败");
         }
     }
 
     private void exportLog() {
-
         try {
-
-            LogUtil.export(
-                    processService.getAllProcesses()
-            );
+            LogUtil.export(processService.getAllProcesses());
 
             JOptionPane.showMessageDialog(
                     this,
@@ -186,7 +209,6 @@ public class MainFrame extends JFrame {
             );
 
         } catch (Exception e) {
-
             JOptionPane.showMessageDialog(
                     this,
                     "导出失败\n" + e.getMessage()
@@ -195,13 +217,10 @@ public class MainFrame extends JFrame {
     }
 
     private void startAutoRefresh() {
-
-        Timer timer =
-                new Timer(
-                        5000,
-                        e -> loadProcessData()
-                );
-
+        Timer timer = new Timer(5000, e -> {
+            updateSystemInfo();
+            loadProcessData();
+        });
         timer.start();
     }
 }
