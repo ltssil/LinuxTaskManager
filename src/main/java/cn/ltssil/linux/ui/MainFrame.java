@@ -9,9 +9,13 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 public class MainFrame extends JFrame {
 
@@ -26,6 +30,7 @@ public class MainFrame extends JFrame {
     private JTable processTable;
     private DefaultTableModel tableModel;
     private JTextField pidField;
+    private JTextField nameField;
     private JComboBox<String> sortBox;
 
     private JButton searchButton;
@@ -84,10 +89,14 @@ public class MainFrame extends JFrame {
         controlPanel.setOpaque(false);
 
         JLabel pidTextLabel = new JLabel("PID:");
-        pidField = new JTextField(12);
+        pidField = new JTextField(10);
         pidField.putClientProperty("JTextField.placeholderText", "输入 PID");
 
-        searchButton = new JButton("查询PID");
+        JLabel nameTextLabel = new JLabel("进程名:");
+        nameField = new JTextField(14);
+        nameField.putClientProperty("JTextField.placeholderText", "输入进程名");
+
+        searchButton = new JButton("搜索");
 
         sortBox = new JComboBox<>(new String[]{
                 "PID升序",
@@ -100,6 +109,8 @@ public class MainFrame extends JFrame {
 
         controlPanel.add(pidTextLabel);
         controlPanel.add(pidField);
+        controlPanel.add(nameTextLabel);
+        controlPanel.add(nameField);
         controlPanel.add(searchButton);
         controlPanel.add(Box.createHorizontalStrut(16));
         controlPanel.add(new JLabel("排序方式:"));
@@ -129,6 +140,7 @@ public class MainFrame extends JFrame {
         processTable.setSelectionBackground(new Color(0, 120, 215));
         processTable.setSelectionForeground(Color.WHITE);
         processTable.setAutoResizeMode(JTable.AUTO_RESIZE_LAST_COLUMN);
+        processTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
         processTable.getTableHeader().setReorderingAllowed(false);
 
@@ -166,6 +178,18 @@ public class MainFrame extends JFrame {
         setColumnWidth(processTable, 3, 90);
         setColumnWidth(processTable, 4, 100);
 
+        processTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    int viewRow = processTable.rowAtPoint(e.getPoint());
+                    if (viewRow >= 0) {
+                        showProcessDetail(viewRow);
+                    }
+                }
+            }
+        });
+
         JScrollPane scrollPane = new JScrollPane(processTable);
         scrollPane.setBorder(BorderFactory.createEmptyBorder());
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
@@ -199,7 +223,7 @@ public class MainFrame extends JFrame {
         styleButton(sortButton, new Color(70, 130, 180));
         styleButton(killButton, new Color(220, 53, 69));
 
-        searchButton.addActionListener(e -> searchByPid());
+        searchButton.addActionListener(e -> searchProcessAsync());
         refreshButton.addActionListener(e -> loadProcessDataAsync());
         killButton.addActionListener(e -> killSelectedProcess());
         exportButton.addActionListener(e -> exportLog());
@@ -234,17 +258,53 @@ public class MainFrame extends JFrame {
     }
 
     private void loadProcessDataAsync() {
+        searchProcessAsync();
+    }
+
+    private void searchProcessAsync() {
         if (loadingWorker != null && !loadingWorker.isDone()) {
             loadingWorker.cancel(true);
         }
 
-        setStatus("正在加载进程数据...");
+        final String pidText = pidField.getText().trim();
+        final String nameText = nameField.getText().trim().toLowerCase();
+
+        if (pidText.isEmpty() && nameText.isEmpty()) {
+            setStatus("正在加载进程数据...");
+        } else {
+            setStatus("正在搜索进程数据...");
+        }
+
+        final Long pidFilter;
+        if (!pidText.isEmpty()) {
+            try {
+                pidFilter = Long.parseLong(pidText);
+            } catch (NumberFormatException ex) {
+                JOptionPane.showMessageDialog(this, "PID必须是数字");
+                return;
+            }
+        } else {
+            pidFilter = null;
+        }
 
         loadingWorker = new SwingWorker<>() {
             @Override
             protected List<ProcessInfo> doInBackground() {
                 List<ProcessInfo> processes = processService.getAllProcesses();
-                return sortProcesses(processes);
+                List<ProcessInfo> matched = new ArrayList<>();
+
+                for (ProcessInfo process : processes) {
+                    boolean pidMatch = pidFilter == null || process.getPid() == pidFilter;
+                    boolean nameMatch = nameText.isEmpty()
+                            || process.getName().toLowerCase().contains(nameText)
+                            || process.getCommand().toLowerCase().contains(nameText);
+
+                    if (pidMatch && nameMatch) {
+                        matched.add(process);
+                    }
+                }
+
+                return sortProcesses(matched);
             }
 
             @Override
@@ -255,20 +315,23 @@ public class MainFrame extends JFrame {
 
                 try {
                     List<ProcessInfo> processes = get();
-                    tableModel.setRowCount(0);
+                    fillTable(processes);
+                    updateSystemInfo(processes.size());
 
-                    for (ProcessInfo process : processes) {
-                        tableModel.addRow(new Object[]{
-                                process.getPid(),
-                                process.getName(),
-                                process.getCommand(),
-                                String.format("%.2f", process.getCpuUsage()),
-                                process.getMemoryMb()
-                        });
+                    if (pidText.isEmpty() && nameText.isEmpty()) {
+                        setStatus("已加载 " + processes.size() + " 个进程");
+                    } else {
+                        setStatus("已找到 " + processes.size() + " 个匹配进程");
                     }
 
-                    updateSystemInfo(processes.size());
-                    setStatus("已加载 " + processes.size() + " 个进程");
+                    if (!pidText.isEmpty() || !nameText.isEmpty()) {
+                        if (processes.isEmpty()) {
+                            JOptionPane.showMessageDialog(
+                                    MainFrame.this,
+                                    "没有找到匹配的进程"
+                            );
+                        }
+                    }
                 } catch (Exception ex) {
                     setStatus("加载失败");
                     JOptionPane.showMessageDialog(
@@ -282,6 +345,24 @@ public class MainFrame extends JFrame {
         };
 
         loadingWorker.execute();
+    }
+
+    private void fillTable(List<ProcessInfo> processes) {
+        tableModel.setRowCount(0);
+
+        for (ProcessInfo process : processes) {
+            addProcessToTable(process);
+        }
+    }
+
+    private void addProcessToTable(ProcessInfo process) {
+        tableModel.addRow(new Object[]{
+                process.getPid(),
+                process.getName(),
+                process.getCommand(),
+                formatCpu(process.getCpuUsage()),
+                process.getMemoryMb()
+        });
     }
 
     private List<ProcessInfo> sortProcesses(List<ProcessInfo> processes) {
@@ -300,38 +381,39 @@ public class MainFrame extends JFrame {
         };
     }
 
-    private void searchByPid() {
-        String text = pidField.getText().trim();
+    private void showProcessDetail(int viewRow) {
+        int modelRow = processTable.convertRowIndexToModel(viewRow);
 
-        if (text.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "请输入PID");
-            return;
-        }
+        Object pidObj = tableModel.getValueAt(modelRow, 0);
+        Object nameObj = tableModel.getValueAt(modelRow, 1);
+        Object commandObj = tableModel.getValueAt(modelRow, 2);
+        Object cpuObj = tableModel.getValueAt(modelRow, 3);
+        Object memoryObj = tableModel.getValueAt(modelRow, 4);
 
-        try {
-            long pid = Long.parseLong(text);
+        StringBuilder sb = new StringBuilder();
+        sb.append("PID：").append(pidObj).append("\n\n");
+        sb.append("进程名称：").append(nameObj).append("\n\n");
+        sb.append("命令路径：").append(commandObj).append("\n\n");
+        sb.append("CPU占用：").append(cpuObj).append("%\n\n");
+        sb.append("内存占用：").append(memoryObj).append(" MB");
 
-            setStatus("正在查询 PID = " + pid + "...");
+        JTextArea area = new JTextArea(sb.toString());
+        area.setEditable(false);
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setFont(new Font("微软雅黑", Font.PLAIN, 14));
+        area.setBackground(new Color(250, 250, 250));
+        area.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
 
-            processService.getProcessByPid(pid).ifPresentOrElse(process -> {
-                tableModel.setRowCount(0);
-                tableModel.addRow(new Object[]{
-                        process.getPid(),
-                        process.getName(),
-                        process.getCommand(),
-                        String.format("%.2f", process.getCpuUsage()),
-                        process.getMemoryMb()
-                });
-                updateSystemInfo(1);
-                setStatus("已查询到 PID = " + pid);
-            }, () -> {
-                setStatus("未找到 PID = " + pid);
-                JOptionPane.showMessageDialog(this, "未找到该PID对应的进程");
-            });
+        JScrollPane pane = new JScrollPane(area);
+        pane.setPreferredSize(new Dimension(620, 320));
 
-        } catch (NumberFormatException ex) {
-            JOptionPane.showMessageDialog(this, "PID必须是数字");
-        }
+        JOptionPane.showMessageDialog(
+                this,
+                pane,
+                "进程详情",
+                JOptionPane.INFORMATION_MESSAGE
+        );
     }
 
     private void killSelectedProcess() {
@@ -378,7 +460,7 @@ public class MainFrame extends JFrame {
     }
 
     private void startAutoRefresh() {
-        Timer timer = new Timer(3000, e -> loadProcessDataAsync());
+        Timer timer = new Timer(1000, e -> loadProcessDataAsync());
         timer.start();
     }
 
@@ -392,5 +474,9 @@ public class MainFrame extends JFrame {
 
     private void setStatus(String text) {
         statusLabel.setText(text);
+    }
+
+    private String formatCpu(double value) {
+        return String.format(Locale.US, "%.2f", value);
     }
 }
