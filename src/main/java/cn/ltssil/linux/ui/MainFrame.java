@@ -2,6 +2,7 @@ package cn.ltssil.linux.ui;
 
 import cn.ltssil.linux.model.ProcessInfo;
 import cn.ltssil.linux.service.ProcessService;
+import cn.ltssil.linux.util.LogUtil;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -77,6 +78,9 @@ public class MainFrame extends JFrame {
         searchButton.addActionListener(e -> searchByPid());
         refreshButton.addActionListener(e -> loadProcessData());
         killButton.addActionListener(e -> killSelectedProcess());
+        exportButton.addActionListener(
+                e -> exportLog()
+        );
     }
 
     private void loadProcessData() {
@@ -163,6 +167,28 @@ public class MainFrame extends JFrame {
             JOptionPane.showMessageDialog(
                     this,
                     "结束失败"
+            );
+        }
+    }
+
+    private void exportLog() {
+
+        try {
+
+            LogUtil.export(
+                    processService.getAllProcesses()
+            );
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "导出成功\nprocess_log.txt"
+            );
+
+        } catch (Exception e) {
+
+            JOptionPane.showMessageDialog(
+                    this,
+                    "导出失败\n" + e.getMessage()
             );
         }
     }
