@@ -27,6 +27,7 @@ public class MainFrame extends JFrame {
         initComponents();
         loadProcessData();
         setVisible(true);
+        startAutoRefresh();
     }
 
     private void initFrame() {
@@ -191,5 +192,16 @@ public class MainFrame extends JFrame {
                     "导出失败\n" + e.getMessage()
             );
         }
+    }
+
+    private void startAutoRefresh() {
+
+        Timer timer =
+                new Timer(
+                        5000,
+                        e -> loadProcessData()
+                );
+
+        timer.start();
     }
 }
