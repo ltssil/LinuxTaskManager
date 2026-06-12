@@ -3,6 +3,8 @@ package cn.ltssil.linux.ui;
 import cn.ltssil.linux.model.ProcessInfo;
 import cn.ltssil.linux.service.ProcessService;
 import cn.ltssil.linux.util.LogUtil;
+import oshi.SystemInfo;
+import oshi.hardware.GlobalMemory;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
@@ -243,18 +245,43 @@ public class MainFrame extends JFrame {
     }
 
     private void updateSystemInfo(long processCount) {
+
         Runtime runtime = Runtime.getRuntime();
 
         int cpuCount = runtime.availableProcessors();
-        long usedMemoryMb = (runtime.totalMemory() - runtime.freeMemory()) / 1024 / 1024;
-        long totalMemoryMb = runtime.totalMemory() / 1024 / 1024;
+
+        GlobalMemory memory =
+                new SystemInfo()
+                        .getHardware()
+                        .getMemory();
+
+        long totalMemoryMb =
+                memory.getTotal() / 1024 / 1024;
+
+        long usedMemoryMb =
+                (memory.getTotal() - memory.getAvailable())
+                        / 1024 / 1024;
 
         cpuLabel.setText("CPU核心数: " + cpuCount);
-        memoryLabel.setText("JVM内存: " + usedMemoryMb + "MB / " + totalMemoryMb + "MB");
+
+        memoryLabel.setText(
+                "系统内存: "
+                        + usedMemoryMb
+                        + "MB / "
+                        + totalMemoryMb
+                        + "MB"
+        );
+
         processCountLabel.setText("进程数: " + processCount);
-        timeLabel.setText("时间: " + LocalDateTime.now().format(
-                DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-        ));
+
+        timeLabel.setText(
+                "时间: "
+                        + LocalDateTime.now().format(
+                        DateTimeFormatter.ofPattern(
+                                "yyyy-MM-dd HH:mm:ss"
+                        )
+                )
+        );
     }
 
     private void loadProcessDataAsync() {
